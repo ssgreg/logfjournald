@@ -21,11 +21,11 @@ type appender struct {
 }
 
 func (a *appender) Append(entry logf.Entry) error {
+	defer a.buf.Reset()
 	err := a.enc.Encode(a.buf, entry)
 	if err != nil {
 		return err
 	}
-	defer a.buf.Reset()
 
 	return a.j.WriteMsg(a.buf.Bytes())
 }

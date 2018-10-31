@@ -439,9 +439,8 @@ func (f *encoder) withValue(fn func()) {
 	// size (64bit LE), the field data and a final newline.
 
 	f.buf.AppendByte('\n')
-	f.buf.AppendBytes([]byte{0, 0, 0, 0, 0, 0, 0, 0})
+	sizeBytes := f.buf.ExtendBytes(8)
 	pos := f.buf.Len()
-	sizeBytes := f.buf.Data[pos-8:]
 
 	fn()
 

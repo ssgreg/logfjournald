@@ -11,7 +11,7 @@ Package `logfjournald` provides `logf` Appender and Encoder for systemd Journal.
 
 The following example creates the new `logf` logger with `logfjournald` appender.
 
-```
+```go
 package main
 
 import (
@@ -43,7 +43,7 @@ func main() {
 
 The JSON representation of the journal entry this generates:
 
-```
+```json
 {
   "TS": "2018-11-01T07:25:18Z",
   "PRIORITY": "6",

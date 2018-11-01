@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"reflect"
 	"time"
-	"unicode/utf8"
 	"unsafe"
 
 	"github.com/ssgreg/journald"
@@ -44,13 +43,28 @@ func (f *encoder) TypeMarshaller(buf *logf.Buffer) logf.TypeMarshaller {
 func (f *encoder) Encode(buf *logf.Buffer, e logf.Entry) error {
 	f.buf = buf
 
+	// There are messages in buffer already. Add message separator.
+	if f.buf.Len() != 0 {
+		f.buf.AppendByte('\n')
+	}
+
 	if !f.DisableFieldLevel {
+		// Both PRIORITY and FieldKeyLevel fields are usable.
+		// 	- PRIORITY allows to use journal native features such as
+		// filtering and color highlighting.
+		// 	- FieldKeyLevel allows to check original severity level.
+
+		// Add journal-compatible priority field on the base of entry's
+		// severity level.
 		f.MarshalFieldInt64("PRIORITY", int64(f.levelToPriority(e.Level)))
 		if f.FieldKeyLevel != "" {
+			// Add logf severity level using the given field name if
+			// specified.
 			f.MarshalFieldString(f.FieldKeyLevel, e.Level.String())
 		}
 	}
 	if !f.DisableFieldMsg {
+		// Ignore FieldKeyMsg in favor of journal-compatible MESSAGE.
 		f.MarshalFieldString("MESSAGE", e.Text)
 	}
 	if !f.DisableFieldTime && f.FieldKeyTime != "" {
@@ -430,7 +444,7 @@ func (f *encoder) MarshalObject(v logf.ObjectMarshaller) {
 }
 
 func (f *encoder) addKey(k string) {
-	f.appendNormalizedKey(f.buf, k)
+	appendNormalizedKey(f.buf, k)
 }
 
 func (f *encoder) withValue(fn func()) {
@@ -446,32 +460,6 @@ func (f *encoder) withValue(fn func()) {
 
 	binary.LittleEndian.PutUint64(sizeBytes, uint64(f.buf.Len()-pos))
 	f.buf.AppendByte('\n')
-}
-
-// appendNormalizedKey appends normalized key to the buf. The journal key
-// name must be in uppercase and consist only of characters, numbers and
-// underscores, and may not begin with an underscore.
-func (f *encoder) appendNormalizedKey(buf *logf.Buffer, s string) error {
-	for i := 0; i < len(s); {
-		c := s[i]
-		switch {
-		case ((c >= 0x30 && c <= 0x39) || (c >= 0x40 && c <= 0x5a)):
-			buf.AppendByte(c)
-			i++
-		case c >= 0x60 && c <= 0x7a:
-			buf.AppendByte(c - 0x20)
-			i++
-		default:
-			if i == 0 {
-				buf.AppendString("LOGF")
-			}
-			buf.AppendByte('_')
-			_, wd := utf8.DecodeRuneInString(s[i:])
-			i += wd
-		}
-	}
-
-	return nil
 }
 
 func (f *encoder) levelToPriority(lvl logf.Level) journald.Priority {
@@ -528,8 +516,6 @@ func knownTypeToBuf(buf *logf.Buffer, v interface{}) bool {
 			return false
 		}
 		switch reflect.TypeOf(rv).Kind() {
-		case reflect.String:
-			buf.AppendString(reflect.ValueOf(rv).String())
 		case reflect.Bool:
 			logf.AppendBool(buf, reflect.ValueOf(rv).Bool())
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:

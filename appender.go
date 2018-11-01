@@ -5,12 +5,13 @@ import (
 	"github.com/ssgreg/logf"
 )
 
-// NewAppender creates an instance of journal appender.
-func NewAppender(e logf.Encoder) logf.Appender {
+// NewAppender creates the new instance of journal appender with the given
+// Encoder.
+func NewAppender(enc logf.Encoder) logf.Appender {
 	return &appender{
 		j:   &journald.Journal{},
-		enc: e,
-		buf: logf.NewBuffer(),
+		enc: enc,
+		buf: logf.NewBufferWithCapacity(logf.PageSize * 2),
 	}
 }
 
@@ -21,13 +22,15 @@ type appender struct {
 }
 
 func (a *appender) Append(entry logf.Entry) error {
-	defer a.buf.Reset()
 	err := a.enc.Encode(a.buf, entry)
 	if err != nil {
 		return err
 	}
+	if a.buf.Len() > logf.PageSize {
+		a.Flush()
+	}
 
-	return a.j.WriteMsg(a.buf.Bytes())
+	return nil
 }
 
 func (a *appender) Sync() (err error) {
@@ -35,5 +38,19 @@ func (a *appender) Sync() (err error) {
 }
 
 func (a *appender) Flush() error {
+	if a.buf.Len() != 0 {
+		defer a.buf.Reset()
+
+		return a.j.WriteMsg(a.buf.Bytes())
+	}
+
 	return nil
+}
+
+func (a *appender) Close() error {
+	defer func() {
+		a.j = nil
+	}()
+
+	return a.j.Close()
 }

@@ -21,4 +21,6 @@ func main() {
 	}
 
 	a.Append(e)
+	a.Append(e)
+	a.Flush()
 }

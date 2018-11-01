@@ -50,6 +50,5 @@ The JSON representation of the journal entry this generates:
   "LEVEL": "info",
   "MESSAGE": "got cpu info",
   "COUNT": "4",
-  ...
 }
 ```

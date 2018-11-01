@@ -15,19 +15,19 @@ The following example creates the new `logf` logger with `logfjournald` appender
 package main
 
 import (
-    "os"
     "runtime"
+
+    "github.com/ssgreg/logf/logfjson"
 
     "github.com/ssgreg/logf"
     "github.com/ssgreg/logfjournald"
 )
 
 func newLogger() (*logf.Logger, logf.ChannelCloser) {
-    c := logf.SetFormatterConfigDefaults(&logf.FormatterConfig{})
-
     channel := logf.NewBasicChannel(logf.ChannelConfig{
-        Appender:      logfjournald.NewAppender(logfjournald.NewEncoder(c, logf.NewJSONTypeMarshallerFactory(c))),
-        ErrorAppender: logf.NewWriteAppender(os.Stderr, logf.NewJSONEncoder(c)),
+        Appender: logfjournald.NewAppender(
+            logfjournald.NewEncoder(logfjournald.EncoderConfig{}, logfjson.NewTypeEncoderFactory(logfjson.EncoderConfig{})),
+        ),
     })
 
     return logf.NewLogger(logf.LevelInfo.Checker(), channel), channel

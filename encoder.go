@@ -3,8 +3,6 @@ package logfjournald
 import (
 	"encoding/base64"
 	"encoding/binary"
-	"fmt"
-	"reflect"
 	"time"
 	"unsafe"
 
@@ -12,30 +10,31 @@ import (
 	"github.com/ssgreg/logf"
 )
 
-// NewEncoder creates the new instance of Encoder for journal format with
-// the given FormatterConfig and TypeMarshallerFactory for non-basic types.
-func NewEncoder(c *logf.FormatterConfig, mf logf.TypeMarshallerFactory) logf.Encoder {
-	return &encoder{c, mf, nil, logf.NewCache(100)}
+// NewEncoder creates the new instance of Encoder for journal Encode with
+// the given EncoderConfig and TypeEncoderFactory for non-basic types.
+func NewEncoder(c EncoderConfig, mf logf.TypeEncoderFactory) logf.Encoder {
+	return &encoder{c.WithDefaults(), mf, nil, logf.NewCache(100)}
 }
 
-// NewTypeMarshallerFactory creates the new instance of TypeMarshallerFactory
-// for journal message format with the given FormatterConfig and another
-// TypeMarshallerFactory for non-basic types.
-func NewTypeMarshallerFactory(c *logf.FormatterConfig, mf logf.TypeMarshallerFactory) logf.TypeMarshallerFactory {
-	return &encoder{c, mf, nil, nil}
+// NewTypeEncoderFactory creates the new instance of TypeEncoderFactory
+// for journal message Encode with the given EncoderConfig and another
+// TypeEncoderFactory for non-basic types.
+func NewTypeEncoderFactory(c EncoderConfig, mf logf.TypeEncoderFactory) logf.TypeEncoderFactory {
+	return &encoder{c.WithDefaults(), mf, nil, nil}
 }
 
 type encoder struct {
-	*logf.FormatterConfig
-	mf logf.TypeMarshallerFactory
+	EncoderConfig
+	mf logf.TypeEncoderFactory
 
 	buf   *logf.Buffer
 	cache *logf.Cache
 }
 
-// TypeMarshaller conforms to TypeMarshallerFactory interface.
-func (f *encoder) TypeMarshaller(buf *logf.Buffer) logf.TypeMarshaller {
+// TypeEncoder conforms to TypeEncoderFactory interface.
+func (f *encoder) TypeEncoder(buf *logf.Buffer) logf.TypeEncoder {
 	f.buf = buf
+
 	return f
 }
 
@@ -56,26 +55,24 @@ func (f *encoder) Encode(buf *logf.Buffer, e logf.Entry) error {
 
 		// Add journal-compatible priority field on the base of entry's
 		// severity level.
-		f.MarshalFieldInt64("PRIORITY", int64(f.levelToPriority(e.Level)))
+		f.EncodeFieldInt64("PRIORITY", int64(f.levelToPriority(e.Level)))
 		if f.FieldKeyLevel != "" {
 			// Add logf severity level using the given field name if
 			// specified.
-			f.MarshalFieldString(f.FieldKeyLevel, e.Level.String())
+			f.addKey(f.FieldKeyLevel)
+			f.EncodeLevel(e.Level, f)
 		}
 	}
-	if !f.DisableFieldMsg {
-		// Ignore FieldKeyMsg in favor of journal-compatible MESSAGE.
-		f.MarshalFieldString("MESSAGE", e.Text)
-	}
+	f.EncodeFieldString("MESSAGE", e.Text)
 	if !f.DisableFieldTime && f.FieldKeyTime != "" {
-		f.MarshalFieldTime(f.FieldKeyTime, e.Time)
+		f.EncodeFieldTime(f.FieldKeyTime, e.Time)
 	}
 	if !f.DisableFieldName && f.FieldKeyName != "" && e.LoggerName != "" {
-		f.MarshalFieldString(f.FieldKeyName, e.LoggerName)
+		f.EncodeFieldString(f.FieldKeyName, e.LoggerName)
 	}
 	if !f.DisableFieldCaller && f.FieldKeyCaller != "" && e.Caller.Specified {
 		f.addKey(f.FieldKeyCaller)
-		f.FormatCaller(e.Caller, f)
+		f.EncodeCaller(e.Caller, f)
 	}
 
 	for _, field := range e.Fields {
@@ -98,348 +95,346 @@ func (f *encoder) Encode(buf *logf.Buffer, e logf.Entry) error {
 	return nil
 }
 
-func (f *encoder) MarshalFieldAny(k string, v interface{}) {
+func (f *encoder) EncodeFieldAny(k string, v interface{}) {
 	f.addKey(k)
-	f.MarshalAny(v)
+	f.EncodeTypeAny(v)
 }
 
-func (f *encoder) MarshalFieldBool(k string, v bool) {
+func (f *encoder) EncodeFieldBool(k string, v bool) {
 	f.addKey(k)
-	f.MarshalBool(v)
+	f.EncodeTypeBool(v)
 }
 
-func (f *encoder) MarshalFieldInt64(k string, v int64) {
+func (f *encoder) EncodeFieldInt64(k string, v int64) {
 	f.addKey(k)
-	f.MarshalInt64(v)
+	f.EncodeTypeInt64(v)
 }
 
-func (f *encoder) MarshalFieldInt32(k string, v int32) {
+func (f *encoder) EncodeFieldInt32(k string, v int32) {
 	f.addKey(k)
-	f.MarshalInt32(v)
+	f.EncodeTypeInt32(v)
 }
 
-func (f *encoder) MarshalFieldInt16(k string, v int16) {
+func (f *encoder) EncodeFieldInt16(k string, v int16) {
 	f.addKey(k)
-	f.MarshalInt16(v)
+	f.EncodeTypeInt16(v)
 }
 
-func (f *encoder) MarshalFieldInt8(k string, v int8) {
+func (f *encoder) EncodeFieldInt8(k string, v int8) {
 	f.addKey(k)
-	f.MarshalInt8(v)
+	f.EncodeTypeInt8(v)
 }
 
-func (f *encoder) MarshalFieldUint64(k string, v uint64) {
+func (f *encoder) EncodeFieldUint64(k string, v uint64) {
 	f.addKey(k)
-	f.MarshalUint64(v)
+	f.EncodeTypeUint64(v)
 }
 
-func (f *encoder) MarshalFieldUint32(k string, v uint32) {
+func (f *encoder) EncodeFieldUint32(k string, v uint32) {
 	f.addKey(k)
-	f.MarshalUint32(v)
+	f.EncodeTypeUint32(v)
 }
 
-func (f *encoder) MarshalFieldUint16(k string, v uint16) {
+func (f *encoder) EncodeFieldUint16(k string, v uint16) {
 	f.addKey(k)
-	f.MarshalUint16(v)
+	f.EncodeTypeUint16(v)
 }
 
-func (f *encoder) MarshalFieldUint8(k string, v uint8) {
+func (f *encoder) EncodeFieldUint8(k string, v uint8) {
 	f.addKey(k)
-	f.MarshalUint8(v)
+	f.EncodeTypeUint8(v)
 }
 
-func (f *encoder) MarshalFieldFloat64(k string, v float64) {
+func (f *encoder) EncodeFieldFloat64(k string, v float64) {
 	f.addKey(k)
-	f.MarshalFloat64(v)
+	f.EncodeTypeFloat64(v)
 }
 
-func (f *encoder) MarshalFieldFloat32(k string, v float32) {
+func (f *encoder) EncodeFieldFloat32(k string, v float32) {
 	f.addKey(k)
-	f.MarshalFloat32(v)
+	f.EncodeTypeFloat32(v)
 }
 
-func (f *encoder) MarshalFieldString(k string, v string) {
+func (f *encoder) EncodeFieldString(k string, v string) {
 	f.addKey(k)
-	f.MarshalString(v)
+	f.EncodeTypeString(v)
 }
 
-func (f *encoder) MarshalFieldDuration(k string, v time.Duration) {
+func (f *encoder) EncodeFieldDuration(k string, v time.Duration) {
 	f.addKey(k)
-	f.MarshalDuration(v)
+	f.EncodeTypeDuration(v)
 }
 
-func (f *encoder) MarshalFieldError(k string, v error) {
-	// The only exception that has no MarshalX function. FormatError can add
+func (f *encoder) EncodeFieldError(k string, v error) {
+	// The only exception that has no EncodeTypeX function. EncodeError can add
 	// new fields by itself.
-	f.FormatError(k, v, f)
+	f.EncodeError(k, v, f)
 }
 
-func (f *encoder) MarshalFieldTime(k string, v time.Time) {
+func (f *encoder) EncodeFieldTime(k string, v time.Time) {
 	f.addKey(k)
-	f.MarshalTime(v)
+	f.EncodeTypeTime(v)
 }
 
-func (f *encoder) MarshalFieldArray(k string, v logf.ArrayMarshaller) {
+func (f *encoder) EncodeFieldArray(k string, v logf.ArrayEncoder) {
 	f.addKey(k)
-	f.MarshalArray(v)
+	f.EncodeTypeArray(v)
 }
 
-func (f *encoder) MarshalFieldObject(k string, v logf.ObjectMarshaller) {
+func (f *encoder) EncodeFieldObject(k string, v logf.ObjectEncoder) {
 	f.addKey(k)
-	f.MarshalObject(v)
+	f.EncodeTypeObject(v)
 }
 
-func (f *encoder) MarshalFieldBytes(k string, v []byte) {
+func (f *encoder) EncodeFieldBytes(k string, v []byte) {
 	f.addKey(k)
-	f.MarshalBytes(v)
+	f.EncodeTypeBytes(v)
 }
 
-func (f *encoder) MarshalFieldBools(k string, v []bool) {
+func (f *encoder) EncodeFieldBools(k string, v []bool) {
 	f.addKey(k)
-	f.MarshalBools(v)
+	f.EncodeTypeBools(v)
 }
 
-func (f *encoder) MarshalFieldInts64(k string, v []int64) {
+func (f *encoder) EncodeFieldInts64(k string, v []int64) {
 	f.addKey(k)
-	f.MarshalInts64(v)
+	f.EncodeTypeInts64(v)
 }
 
-func (f *encoder) MarshalFieldInts32(k string, v []int32) {
+func (f *encoder) EncodeFieldInts32(k string, v []int32) {
 	f.addKey(k)
-	f.MarshalInts32(v)
+	f.EncodeTypeInts32(v)
 }
 
-func (f *encoder) MarshalFieldInts16(k string, v []int16) {
+func (f *encoder) EncodeFieldInts16(k string, v []int16) {
 	f.addKey(k)
-	f.MarshalInts16(v)
+	f.EncodeTypeInts16(v)
 }
 
-func (f *encoder) MarshalFieldInts8(k string, v []int8) {
+func (f *encoder) EncodeFieldInts8(k string, v []int8) {
 	f.addKey(k)
-	f.MarshalInts8(v)
+	f.EncodeTypeInts8(v)
 }
 
-func (f *encoder) MarshalFieldUints64(k string, v []uint64) {
+func (f *encoder) EncodeFieldUints64(k string, v []uint64) {
 	f.addKey(k)
-	f.MarshalUints64(v)
+	f.EncodeTypeUints64(v)
 }
 
-func (f *encoder) MarshalFieldUints32(k string, v []uint32) {
+func (f *encoder) EncodeFieldUints32(k string, v []uint32) {
 	f.addKey(k)
-	f.MarshalUints32(v)
+	f.EncodeTypeUints32(v)
 }
 
-func (f *encoder) MarshalFieldUints16(k string, v []uint16) {
+func (f *encoder) EncodeFieldUints16(k string, v []uint16) {
 	f.addKey(k)
-	f.MarshalUints16(v)
+	f.EncodeTypeUints16(v)
 }
 
-func (f *encoder) MarshalFieldUints8(k string, v []uint8) {
+func (f *encoder) EncodeFieldUints8(k string, v []uint8) {
 	f.addKey(k)
-	f.MarshalUints8(v)
+	f.EncodeTypeUints8(v)
 }
 
-func (f *encoder) MarshalFieldFloats64(k string, v []float64) {
+func (f *encoder) EncodeFieldFloats64(k string, v []float64) {
 	f.addKey(k)
-	f.MarshalFloats64(v)
+	f.EncodeTypeFloats64(v)
 }
 
-func (f *encoder) MarshalFieldFloats32(k string, v []float32) {
+func (f *encoder) EncodeFieldFloats32(k string, v []float32) {
 	f.addKey(k)
-	f.MarshalFloats32(v)
+	f.EncodeTypeFloats32(v)
 }
 
-func (f *encoder) MarshalFieldDurations(k string, v []time.Duration) {
+func (f *encoder) EncodeFieldDurations(k string, v []time.Duration) {
 	f.addKey(k)
-	f.MarshalDurations(v)
+	f.EncodeTypeDurations(v)
 }
 
-func (f *encoder) MarshalAny(v interface{}) {
+func (f *encoder) EncodeTypeAny(v interface{}) {
 	f.withValue(func() {
-		if !knownTypeToBuf(f.buf, v) {
-			f.mf.TypeMarshaller(f.buf).MarshalAny(v)
-		}
+		f.mf.TypeEncoder(f.buf).EncodeTypeAny(v)
 	})
 }
 
-func (f *encoder) MarshalByte(v byte) {
+func (f *encoder) EncodeTypeByte(v byte) {
 	f.withValue(func() {
 		logf.AppendInt(f.buf, int64(v))
 	})
 }
 
-func (f *encoder) MarshalUnsafeBytes(v unsafe.Pointer) {
+func (f *encoder) EncodeTypeUnsafeBytes(v unsafe.Pointer) {
 	f.withValue(func() {
 		f.buf.AppendBytes(*(*[]byte)(v))
 	})
 }
 
-func (f *encoder) MarshalBool(v bool) {
+func (f *encoder) EncodeTypeBool(v bool) {
 	f.withValue(func() {
 		logf.AppendBool(f.buf, v)
 	})
 }
 
-func (f *encoder) MarshalString(v string) {
+func (f *encoder) EncodeTypeString(v string) {
 	f.withValue(func() {
 		f.buf.AppendString(v)
 	})
 }
 
-func (f *encoder) MarshalInt64(v int64) {
+func (f *encoder) EncodeTypeInt64(v int64) {
 	f.withValue(func() {
 		logf.AppendInt(f.buf, v)
 	})
 }
-func (f *encoder) MarshalInt32(v int32) {
+func (f *encoder) EncodeTypeInt32(v int32) {
 	f.withValue(func() {
 		logf.AppendInt(f.buf, int64(v))
 	})
 }
 
-func (f *encoder) MarshalInt16(v int16) {
+func (f *encoder) EncodeTypeInt16(v int16) {
 	f.withValue(func() {
 		logf.AppendInt(f.buf, int64(v))
 	})
 }
 
-func (f *encoder) MarshalInt8(v int8) {
+func (f *encoder) EncodeTypeInt8(v int8) {
 	f.withValue(func() {
 		logf.AppendInt(f.buf, int64(v))
 	})
 }
 
-func (f *encoder) MarshalUint64(v uint64) {
+func (f *encoder) EncodeTypeUint64(v uint64) {
 	f.withValue(func() {
 		logf.AppendUint(f.buf, v)
 	})
 }
 
-func (f *encoder) MarshalUint32(v uint32) {
+func (f *encoder) EncodeTypeUint32(v uint32) {
 	f.withValue(func() {
 		logf.AppendUint(f.buf, uint64(v))
 	})
 }
 
-func (f *encoder) MarshalUint16(v uint16) {
+func (f *encoder) EncodeTypeUint16(v uint16) {
 	f.withValue(func() {
 		logf.AppendUint(f.buf, uint64(v))
 	})
 }
 
-func (f *encoder) MarshalUint8(v uint8) {
+func (f *encoder) EncodeTypeUint8(v uint8) {
 	f.withValue(func() {
 		logf.AppendUint(f.buf, uint64(v))
 	})
 }
 
-func (f *encoder) MarshalFloat64(v float64) {
+func (f *encoder) EncodeTypeFloat64(v float64) {
 	f.withValue(func() {
 		logf.AppendFloat64(f.buf, v)
 	})
 }
 
-func (f *encoder) MarshalFloat32(v float32) {
+func (f *encoder) EncodeTypeFloat32(v float32) {
 	f.withValue(func() {
 		logf.AppendFloat32(f.buf, v)
 	})
 }
 
-func (f *encoder) MarshalDuration(v time.Duration) {
-	f.FormatDuration(v, f)
+func (f *encoder) EncodeTypeDuration(v time.Duration) {
+	f.EncodeDuration(v, f)
 }
 
-func (f *encoder) MarshalTime(v time.Time) {
-	f.FormatTime(v, f)
+func (f *encoder) EncodeTypeTime(v time.Time) {
+	f.EncodeTime(v, f)
 }
 
-func (f *encoder) MarshalBytes(v []byte) {
+func (f *encoder) EncodeTypeBytes(v []byte) {
 	f.withValue(func() {
 		base64.StdEncoding.Encode(f.buf.ExtendBytes(base64.StdEncoding.EncodedLen(len(v))), v)
 	})
 }
 
-func (f *encoder) MarshalBools(v []bool) {
+func (f *encoder) EncodeTypeBools(v []bool) {
 	f.withValue(func() {
-		f.mf.TypeMarshaller(f.buf).MarshalBools(v)
+		f.mf.TypeEncoder(f.buf).EncodeTypeBools(v)
 	})
 }
 
-func (f *encoder) MarshalInts64(v []int64) {
+func (f *encoder) EncodeTypeInts64(v []int64) {
 	f.withValue(func() {
-		f.mf.TypeMarshaller(f.buf).MarshalInts64(v)
+		f.mf.TypeEncoder(f.buf).EncodeTypeInts64(v)
 	})
 }
 
-func (f *encoder) MarshalInts32(v []int32) {
+func (f *encoder) EncodeTypeInts32(v []int32) {
 	f.withValue(func() {
-		f.mf.TypeMarshaller(f.buf).MarshalInts32(v)
+		f.mf.TypeEncoder(f.buf).EncodeTypeInts32(v)
 	})
 }
 
-func (f *encoder) MarshalInts16(v []int16) {
+func (f *encoder) EncodeTypeInts16(v []int16) {
 	f.withValue(func() {
-		f.mf.TypeMarshaller(f.buf).MarshalInts16(v)
+		f.mf.TypeEncoder(f.buf).EncodeTypeInts16(v)
 	})
 }
 
-func (f *encoder) MarshalInts8(v []int8) {
+func (f *encoder) EncodeTypeInts8(v []int8) {
 	f.withValue(func() {
-		f.mf.TypeMarshaller(f.buf).MarshalInts8(v)
+		f.mf.TypeEncoder(f.buf).EncodeTypeInts8(v)
 	})
 }
 
-func (f *encoder) MarshalUints64(v []uint64) {
+func (f *encoder) EncodeTypeUints64(v []uint64) {
 	f.withValue(func() {
-		f.mf.TypeMarshaller(f.buf).MarshalUints64(v)
+		f.mf.TypeEncoder(f.buf).EncodeTypeUints64(v)
 	})
 }
 
-func (f *encoder) MarshalUints32(v []uint32) {
+func (f *encoder) EncodeTypeUints32(v []uint32) {
 	f.withValue(func() {
-		f.mf.TypeMarshaller(f.buf).MarshalUints32(v)
+		f.mf.TypeEncoder(f.buf).EncodeTypeUints32(v)
 	})
 }
 
-func (f *encoder) MarshalUints16(v []uint16) {
+func (f *encoder) EncodeTypeUints16(v []uint16) {
 	f.withValue(func() {
-		f.mf.TypeMarshaller(f.buf).MarshalUints16(v)
+		f.mf.TypeEncoder(f.buf).EncodeTypeUints16(v)
 	})
 }
 
-func (f *encoder) MarshalUints8(v []uint8) {
+func (f *encoder) EncodeTypeUints8(v []uint8) {
 	f.withValue(func() {
-		f.mf.TypeMarshaller(f.buf).MarshalUints8(v)
+		f.mf.TypeEncoder(f.buf).EncodeTypeUints8(v)
 	})
 }
 
-func (f *encoder) MarshalFloats64(v []float64) {
+func (f *encoder) EncodeTypeFloats64(v []float64) {
 	f.withValue(func() {
-		f.mf.TypeMarshaller(f.buf).MarshalFloats64(v)
+		f.mf.TypeEncoder(f.buf).EncodeTypeFloats64(v)
 	})
 }
 
-func (f *encoder) MarshalFloats32(v []float32) {
+func (f *encoder) EncodeTypeFloats32(v []float32) {
 	f.withValue(func() {
-		f.mf.TypeMarshaller(f.buf).MarshalFloats32(v)
+		f.mf.TypeEncoder(f.buf).EncodeTypeFloats32(v)
 	})
 }
 
-func (f *encoder) MarshalDurations(v []time.Duration) {
+func (f *encoder) EncodeTypeDurations(v []time.Duration) {
 	f.withValue(func() {
-		f.mf.TypeMarshaller(f.buf).MarshalDurations(v)
+		f.mf.TypeEncoder(f.buf).EncodeTypeDurations(v)
 	})
 }
 
-func (f *encoder) MarshalArray(v logf.ArrayMarshaller) {
+func (f *encoder) EncodeTypeArray(v logf.ArrayEncoder) {
 	f.withValue(func() {
-		f.mf.TypeMarshaller(f.buf).MarshalArray(v)
+		f.mf.TypeEncoder(f.buf).EncodeTypeArray(v)
 	})
 }
 
-func (f *encoder) MarshalObject(v logf.ObjectMarshaller) {
+func (f *encoder) EncodeTypeObject(v logf.ObjectEncoder) {
 	f.withValue(func() {
-		f.mf.TypeMarshaller(f.buf).MarshalObject(v)
+		f.mf.TypeEncoder(f.buf).EncodeTypeObject(v)
 	})
 }
 
@@ -448,7 +443,7 @@ func (f *encoder) addKey(k string) {
 }
 
 func (f *encoder) withValue(fn func()) {
-	// According to the format, if the value includes a newline
+	// According to the Encode, if the value includes a newline
 	// need to write the field name, plus a newline, then the
 	// size (64bit LE), the field data and a final newline.
 
@@ -475,59 +470,4 @@ func (f *encoder) levelToPriority(lvl logf.Level) journald.Priority {
 	default:
 		return journald.PriorityNotice
 	}
-}
-
-func knownTypeToBuf(buf *logf.Buffer, v interface{}) bool {
-	switch rv := v.(type) {
-	case string:
-		buf.AppendString(rv)
-	case bool:
-		logf.AppendBool(buf, rv)
-	case int:
-		logf.AppendInt(buf, int64(rv))
-	case int8:
-		logf.AppendInt(buf, int64(rv))
-	case int16:
-		logf.AppendInt(buf, int64(rv))
-	case int32:
-		logf.AppendInt(buf, int64(rv))
-	case int64:
-		logf.AppendInt(buf, rv)
-	case uint:
-		logf.AppendUint(buf, uint64(rv))
-	case uint8:
-		logf.AppendUint(buf, uint64(rv))
-	case uint16:
-		logf.AppendUint(buf, uint64(rv))
-	case uint32:
-		logf.AppendUint(buf, uint64(rv))
-	case uint64:
-		logf.AppendUint(buf, rv)
-	case float32:
-		logf.AppendFloat32(buf, rv)
-	case float64:
-		logf.AppendFloat64(buf, rv)
-	case fmt.Stringer:
-		buf.AppendString(rv.String())
-	case error:
-		buf.AppendString(rv.Error())
-	default:
-		if rv == nil {
-			return false
-		}
-		switch reflect.TypeOf(rv).Kind() {
-		case reflect.Bool:
-			logf.AppendBool(buf, reflect.ValueOf(rv).Bool())
-		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-			logf.AppendInt(buf, reflect.ValueOf(rv).Int())
-		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-			logf.AppendUint(buf, reflect.ValueOf(rv).Uint())
-		case reflect.Float32, reflect.Float64:
-			logf.AppendFloat64(buf, reflect.ValueOf(rv).Float())
-		default:
-			return false
-		}
-	}
-
-	return true
 }

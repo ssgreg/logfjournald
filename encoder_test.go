@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ssgreg/logf"
+	"github.com/ssgreg/logf/logfjson"
 	"github.com/stretchr/testify/require"
 )
 
@@ -38,19 +39,19 @@ func (e *myError) Format(f fmt.State, c rune) {
 }
 
 type user struct {
-	Name string
+	Name string `json:"name"`
 }
 type users []*user
 
-func (u *user) MarshalLogfObject(m logf.FieldMarshaller) error {
-	m.MarshalFieldString("name", u.Name)
+func (u *user) EncodeLogfObject(enc logf.FieldEncoder) error {
+	enc.EncodeFieldString("name", u.Name)
 
 	return nil
 }
 
-func (u users) MarshalLogfArray(m logf.TypeMarshaller) error {
+func (u users) EncodeLogfArray(enc logf.TypeEncoder) error {
 	for i := range u {
-		m.MarshalObject(u[i])
+		enc.EncodeTypeObject(u[i])
 	}
 
 	return nil
@@ -166,7 +167,7 @@ func TestEncoder(t *testing.T) {
 						logf.ConstUints32("uts", []uint32{8}),
 					},
 					DerivedFields: []logf.Field{
-						logf.AnError("err", newError("s", "f")),
+						logf.NamedError("err", newError("s", "f")),
 					},
 					LoggerName: "n",
 				},
@@ -176,7 +177,7 @@ func TestEncoder(t *testing.T) {
 				'L', 'E', 'V', 'E', 'L', '\n', 0x7, 0, 0, 0, 0, 0, 0, 0, 'w', 'a', 'r', 'n', 'i', 'n', 'g', '\n',
 				'M', 'E', 'S', 'S', 'A', 'G', 'E', '\n', 0x7, 0, 0, 0, 0, 0, 0, 0, 'm', 'e', 's', 's', 'a', 'g', 'e', '\n',
 				'T', 'S', '\n', 0x14, 0, 0, 0, 0, 0, 0, 0, '0', '0', '0', '1', '-', '0', '1', '-', '0', '1', 'T', '0', '0', ':', '0', '0', ':', '0', '0', 'Z', '\n',
-				'N', 'A', 'M', 'E', '\n', 0x1, 0, 0, 0, 0, 0, 0, 0, 'n', '\n',
+				'L', 'O', 'G', 'G', 'E', 'R', '\n', 0x1, 0, 0, 0, 0, 0, 0, 0, 'n', '\n',
 				'U', 'T', 'S', '\n', 0x3, 0, 0, 0, 0, 0, 0, 0, '[', '8', ']', '\n',
 				'E', 'R', 'R', '\n', 0x1, 0, 0, 0, 0, 0, 0, 0, 's', '\n',
 				'E', 'R', 'R', '_', 'V', 'E', 'R', 'B', 'O', 'S', 'E', '\n', 0x1, 0, 0, 0, 0, 0, 0, 0, 'f', '\n',
@@ -249,7 +250,7 @@ func TestEncoder(t *testing.T) {
 				'M', 'E', 'S', 'S', 'A', 'G', 'E', '\n', 0x7, 0, 0, 0, 0, 0, 0, 0, 'm', 'e', 's', 's', 'a', 'g', 'e', '\n',
 				'T', 'S', '\n', 0x14, 0, 0, 0, 0, 0, 0, 0, '0', '0', '0', '1', '-', '0', '1', '-', '0', '1', 'T', '0', '0', ':', '0', '0', ':', '0', '0', 'Z', '\n',
 				'I', '\n', 0x1, 0, 0, 0, 0, 0, 0, 0, '1', '\n',
-				'U', '\n', 0xd, 0, 0, 0, 0, 0, 0, 0, '{', '"', 'N', 'a', 'm', 'e', '"', ':', '"', 'n', '"', '}', '\n', '\n',
+				'U', '\n', 0xc, 0, 0, 0, 0, 0, 0, 0, '{', '"', 'n', 'a', 'm', 'e', '"', ':', '"', 'n', '"', '}', '\n',
 			},
 		},
 		{
@@ -260,7 +261,7 @@ func TestEncoder(t *testing.T) {
 					Level:    logf.LevelWarn,
 					Text:     "message",
 					Fields: []logf.Field{
-						logf.Any("s", "1"),
+						logf.Any("s", "3"),
 						logf.Any("b", true),
 						logf.Any("i", int(1)),
 						logf.Any("i8", int8(1)),
@@ -278,7 +279,7 @@ func TestEncoder(t *testing.T) {
 						logf.Any("ri", MyInt(1)),
 						logf.Any("ru", MyUint(1)),
 						logf.Any("rb", MyBool(true)),
-						logf.Any("rs", MyString("1")),
+						logf.Any("rs", MyString("2")),
 						logf.Any("rf", MyFloat(1)),
 					},
 				},
@@ -288,7 +289,7 @@ func TestEncoder(t *testing.T) {
 				'L', 'E', 'V', 'E', 'L', '\n', 0x7, 0, 0, 0, 0, 0, 0, 0, 'w', 'a', 'r', 'n', 'i', 'n', 'g', '\n',
 				'M', 'E', 'S', 'S', 'A', 'G', 'E', '\n', 0x7, 0, 0, 0, 0, 0, 0, 0, 'm', 'e', 's', 's', 'a', 'g', 'e', '\n',
 				'T', 'S', '\n', 0x14, 0, 0, 0, 0, 0, 0, 0, '0', '0', '0', '1', '-', '0', '1', '-', '0', '1', 'T', '0', '0', ':', '0', '0', ':', '0', '0', 'Z', '\n',
-				'S', '\n', 0x1, 0, 0, 0, 0, 0, 0, 0, '1', '\n',
+				'S', '\n', 0x1, 0, 0, 0, 0, 0, 0, 0, '3', '\n',
 				'B', '\n', 0x4, 0, 0, 0, 0, 0, 0, 0, 't', 'r', 'u', 'e', '\n',
 				'I', '\n', 0x1, 0, 0, 0, 0, 0, 0, 0, '1', '\n',
 				'I', '8', '\n', 0x1, 0, 0, 0, 0, 0, 0, 0, '1', '\n',
@@ -306,7 +307,7 @@ func TestEncoder(t *testing.T) {
 				'R', 'I', '\n', 0x1, 0, 0, 0, 0, 0, 0, 0, '1', '\n',
 				'R', 'U', '\n', 0x1, 0, 0, 0, 0, 0, 0, 0, '1', '\n',
 				'R', 'B', '\n', 0x4, 0, 0, 0, 0, 0, 0, 0, 't', 'r', 'u', 'e', '\n',
-				'R', 'S', '\n', 0x1, 0, 0, 0, 0, 0, 0, 0, '1', '\n',
+				'R', 'S', '\n', 0x1, 0, 0, 0, 0, 0, 0, 0, '2', '\n',
 				'R', 'F', '\n', 0x1, 0, 0, 0, 0, 0, 0, 0, '1', '\n',
 			},
 		},
@@ -401,18 +402,5 @@ func TestEncoder(t *testing.T) {
 }
 
 func newTestEncoder() logf.Encoder {
-	c := &logf.FormatterConfig{
-		FieldKeyMsg:    "MESSAGE",
-		FieldKeyTime:   "TS",
-		FieldKeyLevel:  "LEVEL",
-		FieldKeyName:   "NAME",
-		FieldKeyCaller: "CALLER",
-
-		FormatTime:     logf.RFC3339TimeFormatter,
-		FormatDuration: logf.StringDurationFormatter,
-		FormatError:    logf.DefaultErrorFormatter,
-		FormatCaller:   logf.ShortCallerFormatter,
-	}
-
-	return NewEncoder(c, logf.NewJSONTypeMarshallerFactory(c))
+	return NewEncoder(EncoderConfig{}, logfjson.NewTypeEncoderFactory(logfjson.EncoderConfig{}))
 }

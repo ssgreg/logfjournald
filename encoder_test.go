@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/ssgreg/logf"
-	"github.com/ssgreg/logf/logfjson"
 	"github.com/stretchr/testify/require"
 )
 
@@ -402,5 +401,5 @@ func TestEncoder(t *testing.T) {
 }
 
 func newTestEncoder() logf.Encoder {
-	return NewEncoder(EncoderConfig{}, logfjson.NewTypeEncoderFactory(logfjson.EncoderConfig{}))
+	return NewEncoder(EncoderConfig{}, logf.NewJSONTypeEncoderFactory(logf.JSONEncoderConfig{}))
 }

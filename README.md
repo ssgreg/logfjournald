@@ -17,8 +17,6 @@ package main
 import (
     "runtime"
 
-    "github.com/ssgreg/logf/logfjson"
-
     "github.com/ssgreg/logf"
     "github.com/ssgreg/logfjournald"
 )
@@ -26,7 +24,7 @@ import (
 func newLogger() (*logf.Logger, logf.ChannelCloser) {
     channel := logf.NewBasicChannel(logf.ChannelConfig{
         Appender: logfjournald.NewAppender(
-            logfjournald.NewEncoder(logfjournald.EncoderConfig{}, logfjson.NewTypeEncoderFactory(logfjson.EncoderConfig{})),
+            logfjournald.NewEncoder(logfjournald.EncoderConfig{}, logf.NewJSONTypeEncoderFactory(logf.JSONEncoderConfig{})),
         ),
     })
 

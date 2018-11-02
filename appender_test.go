@@ -8,7 +8,8 @@ import (
 )
 
 func TestAppender(t *testing.T) {
-	baseApp := NewAppender(newTestEncoder())
+	baseApp, close := NewAppender(NewEncoder.Default())
+
 	app, ok := baseApp.(*appender)
 	require.True(t, ok)
 	app.j.TestModeEnabled = true
@@ -37,7 +38,7 @@ func TestAppender(t *testing.T) {
 	})
 
 	t.Run("Close", func(t *testing.T) {
-		require.NoError(t, app.Close())
+		require.NoError(t, close())
 		require.Empty(t, app.j)
 	})
 }

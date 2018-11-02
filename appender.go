@@ -5,14 +5,22 @@ import (
 	"github.com/ssgreg/logf"
 )
 
+// AppenderCloseFunc allows to close underlying journal at the end of
+// Appender life cycle.
+type AppenderCloseFunc func() error
+
 // NewAppender creates the new instance of journal appender with the given
 // Encoder.
-func NewAppender(enc logf.Encoder) logf.Appender {
-	return &appender{
+func NewAppender(enc logf.Encoder) (logf.Appender, AppenderCloseFunc) {
+	a := &appender{
 		j:   &journald.Journal{},
 		enc: enc,
 		buf: logf.NewBufferWithCapacity(logf.PageSize * 2),
 	}
+
+	return a, AppenderCloseFunc(func() error {
+		return a.Close()
+	})
 }
 
 type appender struct {

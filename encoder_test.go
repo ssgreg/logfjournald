@@ -386,7 +386,7 @@ func TestEncoder(t *testing.T) {
 		},
 	}
 
-	enc := newTestEncoder()
+	enc := NewEncoder.Default()
 
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
@@ -398,8 +398,4 @@ func TestEncoder(t *testing.T) {
 			require.EqualValues(t, tc.Golden, b.Bytes())
 		})
 	}
-}
-
-func newTestEncoder() logf.Encoder {
-	return NewEncoder(EncoderConfig{}, logf.NewJSONTypeEncoderFactory(logf.JSONEncoderConfig{}))
 }

@@ -12,15 +12,31 @@ import (
 
 // NewEncoder creates the new instance of Encoder for journal Encode with
 // the given EncoderConfig and TypeEncoderFactory for non-basic types.
-func NewEncoder(c EncoderConfig, mf logf.TypeEncoderFactory) logf.Encoder {
-	return &encoder{c.WithDefaults(), mf, nil, logf.NewCache(100)}
-}
+var NewEncoder = jsonEncoderGetter(
+	func(c EncoderConfig, mf logf.TypeEncoderFactory) logf.Encoder {
+		return &encoder{c.WithDefaults(), mf, nil, logf.NewCache(100)}
+	},
+)
 
 // NewTypeEncoderFactory creates the new instance of TypeEncoderFactory
 // for journal message Encode with the given EncoderConfig and another
 // TypeEncoderFactory for non-basic types.
-func NewTypeEncoderFactory(c EncoderConfig, mf logf.TypeEncoderFactory) logf.TypeEncoderFactory {
-	return &encoder{c.WithDefaults(), mf, nil, nil}
+var NewTypeEncoderFactory = jsonTypeEncoderFactoryGetter(
+	func(c EncoderConfig, mf logf.TypeEncoderFactory) logf.TypeEncoderFactory {
+		return &encoder{c.WithDefaults(), mf, nil, nil}
+	},
+)
+
+type jsonEncoderGetter func(c EncoderConfig, mf logf.TypeEncoderFactory) logf.Encoder
+
+func (c jsonEncoderGetter) Default() logf.Encoder {
+	return c(EncoderConfig{}, logf.NewJSONTypeEncoderFactory.Default())
+}
+
+type jsonTypeEncoderFactoryGetter func(c EncoderConfig, mf logf.TypeEncoderFactory) logf.TypeEncoderFactory
+
+func (c jsonTypeEncoderFactoryGetter) Default() logf.TypeEncoderFactory {
+	return c(EncoderConfig{}, logf.NewJSONTypeEncoderFactory.Default())
 }
 
 type encoder struct {

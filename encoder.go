@@ -63,38 +63,37 @@ func (f *encoder) Encode(buf *logf.Buffer, e logf.Entry) error {
 		f.buf.AppendByte('\n')
 	}
 
-	if !f.DisableFieldLevel {
-		// Both PRIORITY and FieldKeyLevel fields are usable.
-		// 	- PRIORITY allows to use journal native features such as
-		// filtering and color highlighting.
-		// 	- FieldKeyLevel allows to check original severity level.
-
-		// Add journal-compatible priority field on the base of entry's
-		// severity level.
-		f.EncodeFieldInt64("PRIORITY", int64(f.levelToPriority(e.Level)))
-		if f.FieldKeyLevel != "" {
-			// Add logf severity level using the given field name if
-			// specified.
-			f.addKey(f.FieldKeyLevel)
-			f.EncodeLevel(e.Level, f)
-		}
+	// PRIORITY.
+	if !f.DisableFieldPriority {
+		f.EncodeFieldInt64(DefaultFieldKeyPriority, int64(f.levelToPriority(e.Level)))
 	}
-	f.EncodeFieldString("MESSAGE", e.Text)
-	if !f.DisableFieldTime && f.FieldKeyTime != "" {
+
+	// Level.
+	if !f.DisableFieldLevel {
+		f.addKey(f.FieldKeyLevel)
+		f.EncodeLevel(e.Level, f)
+	}
+
+	// MESSAGE.
+	f.EncodeFieldString(DefaultFieldKeyMessage, e.Text)
+
+	// Time.
+	if !f.DisableFieldTime {
 		f.EncodeFieldTime(f.FieldKeyTime, e.Time)
 	}
-	if !f.DisableFieldName && f.FieldKeyName != "" && e.LoggerName != "" {
+
+	// Logger name.
+	if !f.DisableFieldName && e.LoggerName != "" {
 		f.EncodeFieldString(f.FieldKeyName, e.LoggerName)
 	}
-	if !f.DisableFieldCaller && f.FieldKeyCaller != "" && e.Caller.Specified {
+
+	// Caller.
+	if !f.DisableFieldCaller && e.Caller.Specified {
 		f.addKey(f.FieldKeyCaller)
 		f.EncodeCaller(e.Caller, f)
 	}
 
-	for _, field := range e.Fields {
-		field.Accept(f)
-	}
-
+	// Logger fields.
 	if bytes, ok := f.cache.Get(e.LoggerID); ok {
 		buf.AppendBytes(bytes)
 	} else {
@@ -106,6 +105,11 @@ func (f *encoder) Encode(buf *logf.Buffer, e logf.Entry) error {
 		bf := make([]byte, buf.Len()-le)
 		copy(bf, buf.Data[le:])
 		f.cache.Set(e.LoggerID, bf)
+	}
+
+	// Entry's fields.
+	for _, field := range e.Fields {
+		field.Accept(f)
 	}
 
 	return nil

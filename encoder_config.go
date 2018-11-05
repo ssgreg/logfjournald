@@ -16,7 +16,7 @@ const (
 
 // EncoderConfig allows to configure journal Encoder.
 //
-// Note that PRIORITY and MESSAGE filed names could not be configured.
+// Note that PRIORITY and MESSAGE field names could not be configured.
 // Both PRIORITY and FieldKeyLevel fields are usable.
 // 	- PRIORITY allows to use journal native features such as
 // filtering and color highlighting.

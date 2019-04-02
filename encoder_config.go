@@ -74,7 +74,7 @@ func (c EncoderConfig) WithDefaults() EncoderConfig {
 		c.EncodeDuration = logf.StringDurationEncoder
 	}
 	if c.EncodeTime == nil {
-		c.EncodeTime = logf.RFC3339TimeEncoder
+		c.EncodeTime = logf.RFC3339NanoTimeEncoder
 	}
 	if c.EncodeError == nil {
 		c.EncodeError = logf.DefaultErrorEncoder
